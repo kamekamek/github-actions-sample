@@ -3,28 +3,36 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     
     steps:
     - name: コードをチェックアウト
       uses: actions/checkout@v4
       
-    - name: Node.js環境をセットアップ
-      uses: actions/setup-node@v4
+    - name: GitHub Pages設定
+      uses: actions/configure-pages@v4
+      
+    - name: アーティファクトをアップロード
+      uses: actions/upload-pages-artifact@v3
       with:
-        node-version: '18'
+        path: '.'
         
-    - name: 依存関係をインストール
-      run: npm ci
-      
-    - name: サイトをビルド
-      run: npm run build
-      
     - name: GitHub Pagesにデプロイ
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./dist
+      id: deployment
+      uses: actions/deploy-pages@v4

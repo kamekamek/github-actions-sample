@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code /agents 機能 完全ガイド</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --accent-color: #3b82f6;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --code-bg: #f1f5f9;
+            --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            line-height: 1.7;
+            color: var(--text-color);
+            background: var(--bg-color);
+        }
+
+        .header {
+            background: var(--gradient);
+            color: white;
+            padding: 4rem 0;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header .subtitle {
+            font-size: 1.25rem;
+            opacity: 0.9;
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 3rem;
+            margin: -2rem auto 0;
+            position: relative;
+            z-index: 2;
+        }
+
+        .sidebar {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 2rem;
+            height: fit-content;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 2rem;
+        }
+
+        .sidebar h3 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .sidebar ul {
+            list-style: none;
+        }
+
+        .sidebar li {
+            margin-bottom: 0.5rem;
+        }
+
+        .sidebar a {
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 0.5rem 0;
+            display: block;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .sidebar a:hover {
+            color: var(--primary-color);
+            background: var(--code-bg);
+            padding-left: 1rem;
+        }
+
+        .content {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 3rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 3px solid var(--accent-color);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            color: var(--secondary-color);
+            font-size: 1.8rem;
+            margin: 2.5rem 0 1rem 0;
+            padding-left: 1rem;
+            border-left: 4px solid var(--accent-color);
+        }
+
+        h3 {
+            color: var(--text-color);
+            font-size: 1.3rem;
+            margin: 2rem 0 1rem 0;
+        }
+
+        h4 {
+            color: var(--text-color);
+            font-size: 1.1rem;
+            margin: 1.5rem 0 0.5rem 0;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-color);
+        }
+
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        code {
+            background: var(--code-bg);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.9em;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+        }
+
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .feature-card {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .feature-card h4 {
+            color: var(--primary-color);
+            margin-top: 0;
+        }
+
+        .highlight {
+            background: linear-gradient(120deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.2) 100%);
+            border-left: 4px solid var(--accent-color);
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .warning {
+            background: linear-gradient(120deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.2) 100%);
+            border-left: 4px solid #f59e0b;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .info {
+            background: linear-gradient(120deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.2) 100%);
+            border-left: 4px solid #10b981;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .footer {
+            background: var(--text-color);
+            color: white;
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 4rem;
+        }
+
+        .footer p {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .badge {
+            background: var(--accent-color);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: inline-block;
+            margin: 0.25rem 0.5rem 0.25rem 0;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+                margin-top: 0;
+            }
+
+            .sidebar {
+                position: static;
+                order: 2;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .container {
+                padding: 0 1rem;
+            }
+
+            .content {
+                padding: 2rem;
+            }
+        }
+
+        .toc {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .toc h3 {
+            color: var(--primary-color);
+            margin-top: 0;
+            margin-bottom: 1rem;
+        }
+
+        .toc ul {
+            margin-left: 1rem;
+        }
+
+        .toc a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .toc a:hover {
+            color: var(--primary-color);
+        }
+
+        .scroll-top {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            display: none;
+            z-index: 1000;
+            transition: all 0.3s;
+        }
+
+        .scroll-top:hover {
+            background: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <h1>Claude Code /agents 機能</h1>
+            <p class="subtitle">特定のタスクに特化したカスタムAIサブエージェントを管理するインタラクティブスラッシュコマンドの完全ガイド</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="main-content">
+            <nav class="sidebar">
+                <h3>目次</h3>
+                <ul>
+                    <li><a href="#overview">概要</a></li>
+                    <li><a href="#basic-functions">基本機能と構文</a></li>
+                    <li><a href="#architecture">サブエージェントアーキテクチャ</a></li>
+                    <li><a href="#examples">実践的な使用例</a></li>
+                    <li><a href="#advanced-features">高度な機能</a></li>
+                    <li><a href="#settings">高度な設定オプション</a></li>
+                    <li><a href="#patterns">使用パターンと戦略</a></li>
+                    <li><a href="#best-practices">ベストプラクティス</a></li>
+                    <li><a href="#comparison">Task ツールとの比較</a></li>
+                    <li><a href="#troubleshooting">トラブルシューティング</a></li>
+                    <li><a href="#ecosystem">2025年のエコシステム動向</a></li>
+                </ul>
+            </nav>
+
+            <main class="content">
+                <section id="overview">
+                    <h1>概要</h1>
+                    <div class="highlight">
+                        <p><strong>Claude Code の `/agents` 機能</strong>は、特定のタスクに特化したカスタムAIサブエージェントを管理するインタラクティブスラッシュコマンドです。この機能により、開発者は複雑なワークフローを効率的に自動化し、並列処理によってタスクを高速化できる強力な開発プラットフォームを構築できます。</p>
+                    </div>
+                </section>
+
+                <section id="basic-functions">
+                    <h2>基本機能と構文</h2>
+                    
+                    <h3>/agents コマンド構文</h3>
+                    <pre><code>/agents</code></pre>
+
+                    <h3>主要機能</h3>
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h4>インタラクティブ管理</h4>
+                            <p>直感的なインターフェースでエージェントを作成・管理</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>ツール一覧表示</h4>
+                            <p>MCPサーバーツールを含む利用可能なツールの表示</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>エージェント作成</h4>
+                            <p>新しい専門サブエージェントの作成</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>設定変更</h4>
+                            <p>既存エージェント設定の変更</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>権限管理</h4>
+                            <p>ツール選択と権限の細かな管理</p>
+                        </div>
+                    </div>
+
+                    <h3>スラッシュコマンドシステム統合</h3>
+                    <ul>
+                        <li><strong>アクセス方法</strong>: <code>/</code> を入力することでスラッシュコマンドメニューが表示</li>
+                        <li><strong>ヘルプ機能</strong>: <code>/help</code> コマンドですべての利用可能なコマンドとその機能を確認可能</li>
+                        <li><strong>カスタムコマンド</strong>: <code>.claude/commands</code> フォルダにMarkdownファイルを配置してカスタムコマンドを作成</li>
+                    </ul>
+                </section>
+
+                <section id="architecture">
+                    <h2>サブエージェントアーキテクチャ</h2>
+
+                    <h3>ファイル配置場所（優先順位順）</h3>
+                    <pre><code>1. プロジェクトレベル（最高優先度）
+   .claude/agents/
+
+2. ユーザーレベル（低優先度）  
+   ~/.claude/agents/</code></pre>
+
+                    <h3>サブエージェント定義ファイル構造</h3>
+                    <pre><code>---
+name: エージェント名
+description: "このエージェントをいつ呼び出すか、何をするかの説明"
+tools: tool1, tool2, tool3  # オプション - 省略時は全ツールを継承
+color: green               # オプション - 視覚的識別子
+priority: high             # オプション - 実行優先度
+environment: production    # オプション - 環境設定
+context_mode: minimal      # オプション - 初期化時間の短縮
+---
+
+# システムプロンプトコンテンツ
+エージェントの動作と専門知識に関する詳細な指示。</code></pre>
+
+                    <div class="info">
+                        <h4>並列処理能力</h4>
+                        <ul>
+                            <li><strong>並列度制限</strong>: 最大10個のサブエージェントまで同時実行可能</li>
+                            <li><strong>バッチ処理</strong>: 制限を超える場合はキューイングされ、バッチ単位で実行</li>
+                            <li><strong>コンテキストウィンドウ</strong>: 各サブエージェントが独自のコンテキストウィンドウを保持</li>
+                        </ul>
+                    </div>
+
+                    <h3>サブエージェントの専門分野</h3>
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h4>ファイル操作</h4>
+                            <p>読み書き、検索、分析</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>コード処理</h4>
+                            <p>検索、解析、リファクタリング</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>Bash操作</h4>
+                            <p>システムコマンド実行</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>リサーチタスク</h4>
+                            <p>情報収集、調査</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>テスト実行</h4>
+                            <p>自動テスト、検証</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="examples">
+                    <h2>実践的な使用例</h2>
+
+                    <h3>例1: セキュリティ特化コードレビューエージェント</h3>
+                    <pre><code>---
+name: security-reviewer
+description: "セキュリティ脆弱性に特化したコードレビュー。OWASP準拠とセキュアコーディングプラクティスに焦点を当てる"
+tools: Read, Grep, Glob, Bash
+color: red
+priority: high
+---
+
+あなたはセキュリティ専門のコードレビュアーです。以下の観点でコードを分析してください：
+
+## 分析項目
+1. **認証・認可の問題**
+   - 不適切な認証メカニズム
+   - 権限昇格の脆弱性
+   - セッション管理の問題
+
+2. **入力検証**
+   - SQLインジェクション
+   - XSS（クロスサイトスクリプティング）
+   - コマンドインジェクション
+
+3. **データ保護**
+   - 機密情報の平文保存
+   - 不適切な暗号化実装
+   - ログでの機密情報漏洩
+
+4. **OWASP Top 10 準拠性**
+   - 最新のOWASP脆弱性リストとの照合
+   - セキュリティ設定の不備</code></pre>
+
+                    <h3>例2: パフォーマンス最適化エージェント</h3>
+                    <pre><code>---
+name: performance-optimizer
+description: "コードパフォーマンスの分析と最適化。ボトルネックの特定と改善提案を行う"
+tools: Read, Grep, Glob, Bash
+color: blue
+---
+
+パフォーマンス最適化の専門家として、以下の手順でコードを分析します：
+
+## 分析手順
+1. **プロファイリング**
+   - CPU使用率の分析
+   - メモリ消費パターンの確認
+   - I/O操作の効率性評価
+
+2. **ボトルネック特定**
+   - 実行時間の長い処理の特定
+   - 非効率なアルゴリズムの検出
+   - データベースクエリの最適化機会</code></pre>
+
+                    <h3>例3: テスト自動実行エージェント</h3>
+                    <pre><code>---
+name: test-runner
+description: "コード変更時に自動的にテストを実行し、失敗時は分析・修正を行う"
+tools: Read, Write, Bash, Grep
+color: green
+priority: high
+---
+
+テスト自動化の専門家として、以下のワークフローを実行します：
+
+## 自動実行タスク
+1. **テスト検出**
+   - 変更されたファイルに関連するテストの特定
+   - テストスイート全体の必要性判断
+
+2. **テスト実行**
+   - 単体テストの実行
+   - 統合テストの実行
+   - カバレッジレポートの生成</code></pre>
+                </section>
+
+                <section id="advanced-features">
+                    <h2>高度な機能</h2>
+
+                    <h3>MCP（Model Context Protocol）統合</h3>
+                    
+                    <div class="highlight">
+                        <h4>2025年の進化</h4>
+                        <ul>
+                            <li><strong>業界標準化</strong>: OpenAI（3月）、Google DeepMind（4月）が正式採用</li>
+                            <li><strong>エコシステム拡大</strong>: 5,000以上のコミュニティMCPサーバーが利用可能</li>
+                            <li><strong>企業統合</strong>: Azure AI Agent Serviceとの統合実現</li>
+                        </ul>
+                    </div>
+
+                    <h4>主要MCPサーバー</h4>
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h4>GitHub</h4>
+                            <p>イシュー管理、PR処理、CI/CD連携</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>Apidog</h4>
+                            <p>API文書化、テスト、コード生成</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>統合サービス</h4>
+                            <p>Google Drive、Slack、Postgres、Puppeteer</p>
+                        </div>
+                    </div>
+
+                    <h3>マルチエージェントワークフロー</h3>
+                    
+                    <h4>並列実装パターン</h4>
+                    <div class="info">
+                        <strong>7-並列Taskメソッド:</strong>
+                        <ol>
+                            <li>Component: メインコンポーネントファイル作成</li>
+                            <li>Styles: コンポーネントスタイル/CSS作成</li>
+                            <li>Tests: テストファイル作成</li>
+                            <li>Types: 型定義作成</li>
+                            <li>Hooks: カスタムフック/ユーティリティ作成</li>
+                            <li>Integration: ルーティング、インポート、エクスポート更新</li>
+                            <li>Remaining: package.json、文書化、設定ファイル更新</li>
+                        </ol>
+                    </div>
+
+                    <h4>エージェントクラスター管理</h4>
+                    <ul>
+                        <li><strong>Claude Squad</strong>: 複数のClaude Code、Codex、Geminiエージェントを並行管理</li>
+                        <li><strong>管理可能数</strong>: 熟練者は最大10個のエージェントを同時管理可能</li>
+                        <li><strong>ワークスペース分離</strong>: 各エージェントが独立したワークスペースで動作</li>
+                    </ul>
+                </section>
+
+                <section id="settings">
+                    <h2>高度な設定オプション</h2>
+
+                    <h3>settings.local.json での権限管理</h3>
+                    <pre><code>{
+  "permissions": {
+    "allow": [
+      "Bash(npm test, npm run lint)",
+      "WebFetch(domain:*.github.com)",
+      "Read",
+      "Write",
+      "Grep"
+    ],
+    "deny": [
+      "Bash(rm -rf)",
+      "WebFetch(domain:untrusted.com)"
+    ]
+  },
+  "agents": {
+    "auto_delegate": true,
+    "parallel_limit": 5,
+    "context_preservation": "minimal"
+  }
+}</code></pre>
+
+                    <h3>引数付きエージェント</h3>
+                    <pre><code>---
+name: github-issue-fixer
+description: "GitHub イシューを分析して修正。使用例: /agents github-issue-fixer 1234"
+tools: Read, Write, Bash, WebFetch
+---
+
+GitHub イシュー #$ARGUMENTS を分析し、以下の手順で修正を行います：
+
+1. イシューの詳細取得と分析
+2. 関連コードの特定
+3. 修正方針の策定
+4. 実装とテスト
+5. PR作成の準備</code></pre>
+                </section>
+
+                <section id="patterns">
+                    <h2>使用パターンと戦略</h2>
+
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h4>1. 自動委任パターン</h4>
+                            <p>Claude Code が自動的に適切なエージェントを選択</p>
+                            <code>// 例: セキュリティ関連の変更 → security-reviewer が自動起動</code>
+                        </div>
+                        <div class="feature-card">
+                            <h4>2. 明示的呼び出しパターン</h4>
+                            <p>特定のエージェントを明示的に呼び出し</p>
+                            <code>> security-reviewer を使って最新の変更をチェックして</code>
+                        </div>
+                        <div class="feature-card">
+                            <h4>3. 並列マルチエージェントパターン</h4>
+                            <p>複数のエージェントを並列実行</p>
+                            <code>> security-reviewer と performance-optimizer を並列で実行</code>
+                        </div>
+                        <div class="feature-card">
+                            <h4>4. カスタムコマンド統合パターン</h4>
+                            <p>エージェントを順次実行する包括的なワークフロー</p>
+                            <code>.claude/commands/comprehensive-review.md</code>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="best-practices">
+                    <h2>エージェント管理のベストプラクティス</h2>
+
+                    <h3>1. エージェント設計原則</h3>
+                    <ul>
+                        <li><strong>単一責任</strong>: 1つのエージェントは1つの専門分野に集中</li>
+                        <li><strong>明確な境界</strong>: 役割と責任の明確な定義</li>
+                        <li><strong>再利用性</strong>: プロジェクト間で再利用可能な設計</li>
+                    </ul>
+
+                    <h3>2. 命名規則</h3>
+                    <div class="info">
+                        <strong>形式: 目的-機能</strong><br>
+                        例:<br>
+                        <span class="badge">security-reviewer</span>
+                        <span class="badge">performance-optimizer</span>
+                        <span class="badge">test-automation</span>
+                        <span class="badge">docs-generator</span>
+                    </div>
+
+                    <h3>3. ツール制限戦略</h3>
+                    <pre><code># セキュリティ重視の制限例
+tools: Read, Grep, Glob  # 読み取り専用操作のみ
+
+# 実装エージェントの場合
+tools: Read, Write, Bash, Grep, Glob  # 実装に必要な全ツール
+
+# 研究特化エージェントの場合  
+tools: WebFetch, Read, Grep  # 情報収集に特化</code></pre>
+
+                    <h3>4. コンテキスト最適化</h3>
+                    <pre><code>context_mode: minimal  # 初期化高速化
+context_mode: full     # 完全なコンテキスト保持
+context_mode: selective # 選択的コンテキスト保持</code></pre>
+
+                    <h3>5. タスク編成の原則</h3>
+                    <ol>
+                        <li><strong>明示的な委任</strong>: マルチスレッドプログラミングのような明確な指示が必要</li>
+                        <li><strong>関連タスクのグループ化</strong>: 個別エージェント作成よりも効率的</li>
+                        <li><strong>トークンコスト最適化</strong>: パフォーマンス向上とコスト削減のバランス</li>
+                        <li><strong>段階的処理</strong>: 計画→実行→検証→統合のフェーズ分離</li>
+                    </ol>
+                </section>
+
+                <section id="comparison">
+                    <h2>Task ツールとの比較</h2>
+
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h4>/agents (サブエージェント)</h4>
+                            <ul>
+                                <li><strong>永続的設定</strong>: ファイルで定義、セッション間で再利用可能</li>
+                                <li><strong>専門システムプロンプト</strong>: カスタム動作と専門知識</li>
+                                <li><strong>ツール制限</strong>: セキュリティのため特定ツールに制限可能</li>
+                                <li><strong>自動選択</strong>: タスクコンテキストに基づく自動委任</li>
+                            </ul>
+                        </div>
+                        <div class="feature-card">
+                            <h4>Task ツール</h4>
+                            <ul>
+                                <li><strong>一時的委任</strong>: 一時的なサブタスクを作成</li>
+                                <li><strong>同一ツールアクセス</strong>: メインエージェントからすべてのツールを継承</li>
+                                <li><strong>カスタムプロンプトなし</strong>: デフォルトのClaude動作を使用</li>
+                                <li><strong>手動呼び出し</strong>: メインエージェントによる明示的呼び出しが必要</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="warning">
+                        <h4>Task ツールの制限事項</h4>
+                        <ul>
+                            <li><strong>ネストしたエージェント生成不可</strong>: サブエージェントはさらなるサブエージェントを生成できない</li>
+                            <li><strong>バッチ実行</strong>: 現在のバッチが完了するまで次のバッチは開始されない</li>
+                            <li><strong>階層構造の制限</strong>: 複雑な階層エージェント構造は制限される</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section id="troubleshooting">
+                    <h2>トラブルシューティング</h2>
+
+                    <h3>よくある問題と解決策</h3>
+
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h4>1. エージェントが認識されない</h4>
+                            <pre><code># ファイル配置確認
+ls -la .claude/agents/
+
+# YAML形式の確認
+cat .claude/agents/your-agent.md</code></pre>
+                        </div>
+                        <div class="feature-card">
+                            <h4>2. ツール権限エラー</h4>
+                            <pre><code>// settings.local.json で権限確認
+{
+  "permissions": {
+    "allow": ["必要なツール名"]
+  }
+}</code></pre>
+                        </div>
+                        <div class="feature-card">
+                            <h4>3. パフォーマンス低下</h4>
+                            <pre><code># context_mode を最適化
+context_mode: minimal
+
+# 不要なツールを除外
+tools: Read, Grep  # 必要最小限に限定</code></pre>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="ecosystem">
+                    <h2>2025年のエコシステム動向</h2>
+
+                    <h3>業界動向</h3>
+                    <ul>
+                        <li><strong>標準化の進展</strong>: MCPが「AIのためのUSB-C」として確立</li>
+                        <li><strong>コミュニティ成長</strong>: 1,000以上のコミュニティサーバーが活用可能</li>
+                        <li><strong>エンタープライズ採用</strong>: 主要AI企業による標準採用</li>
+                    </ul>
+
+                    <h3>将来性</h3>
+                    <div class="highlight">
+                        <ul>
+                            <li><strong>汎用AIエージェント</strong>: 単なるコーディングエージェントを超えた汎用的なインテリジェンス</li>
+                            <li><strong>自動化革命</strong>: 複雑なインフラ要件を数分で実装可能な変革的能力</li>
+                            <li><strong>マルチモーダル統合</strong>: 健康データ分析から構造化データ抽出まで多様な応用</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section>
+                    <h2>まとめ</h2>
+                    <div class="highlight">
+                        <p>Claude Code の <code>/agents</code> 機能は、2025年において開発ワークフローの根本的変革をもたらす技術として確立されています。単純なコード補完を超えて、複雑なマルチエージェントワークフロー、並列タスク処理、専門分野の専門知識を組み合わせた包括的な開発プラットフォームとして進化しています。</p>
+                        
+                        <p>専門的なAIアシスタントを通じて開発ワークフローを大幅に効率化する強力なツールです。適切な設計と実装により、コードレビュー、テスト自動化、パフォーマンス最適化、セキュリティ分析など、あらゆる開発タスクを専門家レベルで自動化できます。</p>
+                        
+                        <p>MCP統合、サブエージェント並列処理、カスタムコマンド作成により、開発者は前例のない効率性と自動化を実現できるようになっています。適切な理解と実装により、従来の開発プロセスを大幅に加速し、より高度で複雑なタスクへの対応が可能となります。</p>
+                        
+                        <p>プロジェクトの要件に応じてカスタマイズされたエージェントを作成し、チーム全体での一貫した品質と効率性を実現することが可能になります。</p>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 Claude Code /agents 機能ガイド - GitHub Pages で公開</p>
+        </div>
+    </footer>
+
+    <button class="scroll-top" onclick="scrollToTop()">↑</button>
+
+    <script>
+        // スムーススクロール
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            });
+        });
+
+        // スクロールトップボタン
+        window.addEventListener('scroll', function() {
+            const scrollTop = document.querySelector('.scroll-top');
+            if (window.pageYOffset > 300) {
+                scrollTop.style.display = 'block';
+            } else {
+                scrollTop.style.display = 'none';
+            }
+        });
+
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+
+        // アクティブなナビゲーションリンクのハイライト
+        window.addEventListener('scroll', function() {
+            const sections = document.querySelectorAll('section[id]');
+            const navLinks = document.querySelectorAll('.sidebar a');
+            
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (window.pageYOffset >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.style.color = '';
+                link.style.backgroundColor = '';
+                link.style.paddingLeft = '';
+                if (link.getAttribute('href') === '#' + current) {
+                    link.style.color = 'var(--primary-color)';
+                    link.style.backgroundColor = 'var(--code-bg)';
+                    link.style.paddingLeft = '1rem';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
