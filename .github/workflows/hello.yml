@@ -1,0 +1,15 @@
+name: My First GitHub Actions
+on: [push]
+
+jobs:
+  hello-world:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Say hello
+        run: echo "Hello, GitHub Actions!"
+      
+      - name: Show current date
+        run: date
+      
+      - name: List files
+        run: ls -la
