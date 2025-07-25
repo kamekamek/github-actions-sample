@@ -364,9 +364,9 @@
                     <li><a href="#settings">高度な設定オプション</a></li>
                     <li><a href="#patterns">使用パターンと戦略</a></li>
                     <li><a href="#best-practices">ベストプラクティス</a></li>
-                    <li><a href="#comparison">Task ツールとの比較</a></li>
+                    <li><a href="#comparison">サブエージェントの仕組み</a></li>
                     <li><a href="#troubleshooting">トラブルシューティング</a></li>
-                    <li><a href="#ecosystem">2025年のエコシステム動向</a></li>
+                    <li><a href="#ecosystem">技術動向と今後の展望</a></li>
                 </ul>
             </nav>
 
@@ -374,7 +374,7 @@
                 <section id="overview">
                     <h1>概要</h1>
                     <div class="highlight">
-                        <p><strong>Claude Code の `/agents` 機能</strong>は、特定のタスクに特化したカスタムAIサブエージェントを管理するインタラクティブスラッシュコマンドです。この機能により、開発者は複雑なワークフローを効率的に自動化し、並列処理によってタスクを高速化できる強力な開発プラットフォームを構築できます。</p>
+                        <p><strong>Claude Code の `/agents` 機能</strong>は、特定のタスクに特化したカスタムAIサブエージェントを管理するインタラクティブスラッシュコマンドです。この機能により、開発者は複雑なワークフローを効率的に自動化し、専門的な処理によってタスクを高速化できる強力な開発プラットフォームを構築できます。</p>
                     </div>
                 </section>
 
@@ -431,21 +431,17 @@
 name: エージェント名
 description: "このエージェントをいつ呼び出すか、何をするかの説明"
 tools: tool1, tool2, tool3  # オプション - 省略時は全ツールを継承
-color: green               # オプション - 視覚的識別子
-priority: high             # オプション - 実行優先度
-environment: production    # オプション - 環境設定
-context_mode: minimal      # オプション - 初期化時間の短縮
 ---
 
 # システムプロンプトコンテンツ
 エージェントの動作と専門知識に関する詳細な指示。</code></pre>
 
                     <div class="info">
-                        <h4>並列処理能力</h4>
+                        <h4>サブエージェントの特徴</h4>
                         <ul>
-                            <li><strong>並列度制限</strong>: 最大10個のサブエージェントまで同時実行可能</li>
-                            <li><strong>バッチ処理</strong>: 制限を超える場合はキューイングされ、バッチ単位で実行</li>
-                            <li><strong>コンテキストウィンドウ</strong>: 各サブエージェントが独自のコンテキストウィンドウを保持</li>
+                            <li><strong>独立したコンテキスト</strong>: 各サブエージェントが独自のコンテキストウィンドウを保持</li>
+                            <li><strong>専門的な処理</strong>: 特定のタスクに特化した処理が可能</li>
+                            <li><strong>ツール制限</strong>: 必要に応じてアクセス可能なツールを制限</li>
                         </ul>
                     </div>
 
@@ -482,8 +478,6 @@ context_mode: minimal      # オプション - 初期化時間の短縮
 name: security-reviewer
 description: "セキュリティ脆弱性に特化したコードレビュー。OWASP準拠とセキュアコーディングプラクティスに焦点を当てる"
 tools: Read, Grep, Glob, Bash
-color: red
-priority: high
 ---
 
 あなたはセキュリティ専門のコードレビュアーです。以下の観点でコードを分析してください：
@@ -513,7 +507,6 @@ priority: high
 name: performance-optimizer
 description: "コードパフォーマンスの分析と最適化。ボトルネックの特定と改善提案を行う"
 tools: Read, Grep, Glob, Bash
-color: blue
 ---
 
 パフォーマンス最適化の専門家として、以下の手順でコードを分析します：
@@ -534,8 +527,6 @@ color: blue
 name: test-runner
 description: "コード変更時に自動的にテストを実行し、失敗時は分析・修正を行う"
 tools: Read, Write, Bash, Grep
-color: green
-priority: high
 ---
 
 テスト自動化の専門家として、以下のワークフローを実行します：
@@ -557,11 +548,11 @@ priority: high
                     <h3>MCP（Model Context Protocol）統合</h3>
                     
                     <div class="highlight">
-                        <h4>2025年の進化</h4>
+                        <h4>MCP統合</h4>
                         <ul>
-                            <li><strong>業界標準化</strong>: OpenAI（3月）、Google DeepMind（4月）が正式採用</li>
-                            <li><strong>エコシステム拡大</strong>: 5,000以上のコミュニティMCPサーバーが利用可能</li>
-                            <li><strong>企業統合</strong>: Azure AI Agent Serviceとの統合実現</li>
+                            <li><strong>公式サポート</strong>: Claude CodeはModel Context Protocol (MCP)をサポート</li>
+                            <li><strong>オープンプロトコル</strong>: 2024年11月にAnthropic公式発表</li>
+                            <li><strong>外部ツール連携</strong>: 多様なデータソースとツールへのアクセスが可能</li>
                         </ul>
                     </div>
 
@@ -583,25 +574,21 @@ priority: high
 
                     <h3>マルチエージェントワークフロー</h3>
                     
-                    <h4>並列実装パターン</h4>
+                    <h4>マルチエージェント活用</h4>
                     <div class="info">
-                        <strong>7-並列Taskメソッド:</strong>
-                        <ol>
-                            <li>Component: メインコンポーネントファイル作成</li>
-                            <li>Styles: コンポーネントスタイル/CSS作成</li>
-                            <li>Tests: テストファイル作成</li>
-                            <li>Types: 型定義作成</li>
-                            <li>Hooks: カスタムフック/ユーティリティ作成</li>
-                            <li>Integration: ルーティング、インポート、エクスポート更新</li>
-                            <li>Remaining: package.json、文書化、設定ファイル更新</li>
-                        </ol>
+                        <p><strong>複数サブエージェントの連携:</strong></p>
+                        <ul>
+                            <li>異なる専門分野のサブエージェントを組み合わせた複雑なワークフロー</li>
+                            <li>コンテキストを保持しながら段階的なタスク処理</li>
+                            <li>専門知識を活かした効率的なコード開発</li>
+                        </ul>
                     </div>
 
-                    <h4>エージェントクラスター管理</h4>
+                    <h4>実際の活用例</h4>
                     <ul>
-                        <li><strong>Claude Squad</strong>: 複数のClaude Code、Codex、Geminiエージェントを並行管理</li>
-                        <li><strong>管理可能数</strong>: 熟練者は最大10個のエージェントを同時管理可能</li>
-                        <li><strong>ワークスペース分離</strong>: 各エージェントが独立したワークスペースで動作</li>
+                        <li><strong>専門化</strong>: ヘッドライン作成とコンテンツ記述で異なるサブエージェントを使用</li>
+                        <li><strong>スケール処理</strong>: 大量のデータ処理を複数のサブエージェントで分散</li>
+                        <li><strong>品質向上</strong>: 各分野の専門エージェントにより高品質な出力を実現</li>
                     </ul>
                 </section>
 
@@ -703,22 +690,27 @@ tools: Read, Write, Bash, Grep, Glob  # 実装に必要な全ツール
 # 研究特化エージェントの場合  
 tools: WebFetch, Read, Grep  # 情報収集に特化</code></pre>
 
-                    <h3>4. コンテキスト最適化</h3>
-                    <pre><code>context_mode: minimal  # 初期化高速化
-context_mode: full     # 完全なコンテキスト保持
-context_mode: selective # 選択的コンテキスト保持</code></pre>
+                    <h3>4. 記述のベストプラクティス</h3>
+                    <ul>
+                        <li><strong>明確な説明</strong>: description フィールドは具体的で行動指向的に記述</li>
+                        <li><strong>プロアクティブな使用</strong>: "PROACTIVELY" や "MUST BE USED" などの語句を含める</li>
+                        <li><strong>詳細なシステムプロンプト</strong>: 役割、能力、制約を明確に定義</li>
+                    </ul>
 
                     <h3>5. タスク編成の原則</h3>
                     <ol>
-                        <li><strong>明示的な委任</strong>: マルチスレッドプログラミングのような明確な指示が必要</li>
+                        <li><strong>明示的な委任</strong>: 明確な指示による効率的なタスク分割</li>
                         <li><strong>関連タスクのグループ化</strong>: 個別エージェント作成よりも効率的</li>
-                        <li><strong>トークンコスト最適化</strong>: パフォーマンス向上とコスト削減のバランス</li>
+                        <li><strong>コンテキスト最適化</strong>: メイン会話のコンテキスト可用性保持</li>
                         <li><strong>段階的処理</strong>: 計画→実行→検証→統合のフェーズ分離</li>
                     </ol>
                 </section>
 
                 <section id="comparison">
-                    <h2>Task ツールとの比較</h2>
+                    <h2>サブエージェントの仕組み</h2>
+
+                    <h3>Claude Code の内部処理</h3>
+                    <p>Claude Code は内部で <strong>Task ツール</strong>（dispatch_agent）を使用してサブエージェント機能を実現しています。</p>
 
                     <div class="feature-grid">
                         <div class="feature-card">
@@ -731,24 +723,39 @@ context_mode: selective # 選択的コンテキスト保持</code></pre>
                             </ul>
                         </div>
                         <div class="feature-card">
-                            <h4>Task ツール</h4>
+                            <h4>内部処理の仕組み</h4>
                             <ul>
-                                <li><strong>一時的委任</strong>: 一時的なサブタスクを作成</li>
-                                <li><strong>同一ツールアクセス</strong>: メインエージェントからすべてのツールを継承</li>
-                                <li><strong>カスタムプロンプトなし</strong>: デフォルトのClaude動作を使用</li>
-                                <li><strong>手動呼び出し</strong>: メインエージェントによる明示的呼び出しが必要</li>
+                                <li><strong>Task ツール</strong>: Claude Code内部でのサブエージェント管理</li>
+                                <li><strong>効率的な委任</strong>: 適切なタスクの自動的な振り分け</li>
+                                <li><strong>コンテキスト管理</strong>: メイン会話とサブタスクの分離</li>
+                                <li><strong>柔軟な処理</strong>: タスクの性質に応じた動的な処理</li>
                             </ul>
                         </div>
                     </div>
 
-                    <div class="warning">
-                        <h4>Task ツールの制限事項</h4>
+                    <div class="info">
+                        <h4>サブエージェントの利点</h4>
                         <ul>
-                            <li><strong>ネストしたエージェント生成不可</strong>: サブエージェントはさらなるサブエージェントを生成できない</li>
-                            <li><strong>バッチ実行</strong>: 現在のバッチが完了するまで次のバッチは開始されない</li>
-                            <li><strong>階層構造の制限</strong>: 複雑な階層エージェント構造は制限される</li>
+                            <li><strong>効率的な問題解決</strong>: タスク固有の設定による高い成功率</li>
+                            <li><strong>コンテキスト保護</strong>: メイン会話のコンテキストを汚染しない</li>
+                            <li><strong>再利用性</strong>: 異なるプロジェクト間での共有が可能</li>
                         </ul>
                     </div>
+
+                    <h3>設計上の考慮事項</h3>
+                    <p>サブエージェントシステムは、効率性とコンテキスト管理のバランスを重視した設計となっています：</p>
+                    <ol>
+                        <li><strong>専門化の重視</strong>: 単一責任原則に基づく設計</li>
+                        <li><strong>コンテキスト効率</strong>: メイン会話の可用性を保持</li>
+                        <li><strong>セキュリティ</strong>: ツールアクセスの適切な制限</li>
+                    </ol>
+
+                    <h3>最適化のポイント</h3>
+                    <ul>
+                        <li><strong>適切なタスク分割</strong>: サブエージェントに適した粒度での作業分割</li>
+                        <li><strong>効率的な設計</strong>: 目的に特化したエージェント設計</li>
+                        <li><strong>戦略的活用</strong>: プロジェクトの要件に応じた柔軟な運用</li>
+                    </ul>
                 </section>
 
                 <section id="troubleshooting">
@@ -776,9 +783,8 @@ cat .claude/agents/your-agent.md</code></pre>
                         </div>
                         <div class="feature-card">
                             <h4>3. パフォーマンス低下</h4>
-                            <pre><code># context_mode を最適化
-context_mode: minimal
-
+                            <pre><code># エージェント設計の最適化
+# 単一責任原則の遵守
 # 不要なツールを除外
 tools: Read, Grep  # 必要最小限に限定</code></pre>
                         </div>
@@ -786,21 +792,21 @@ tools: Read, Grep  # 必要最小限に限定</code></pre>
                 </section>
 
                 <section id="ecosystem">
-                    <h2>2025年のエコシステム動向</h2>
+                    <h2>技術動向と今後の展望</h2>
 
-                    <h3>業界動向</h3>
+                    <h3>技術動向</h3>
                     <ul>
-                        <li><strong>標準化の進展</strong>: MCPが「AIのためのUSB-C」として確立</li>
-                        <li><strong>コミュニティ成長</strong>: 1,000以上のコミュニティサーバーが活用可能</li>
-                        <li><strong>エンタープライズ採用</strong>: 主要AI企業による標準採用</li>
+                        <li><strong>MCP統合</strong>: Model Context Protocolによる外部ツール連携の標準化</li>
+                        <li><strong>サブエージェント活用</strong>: 専門化されたAIアシスタントによる効率化</li>
+                        <li><strong>開発者体験</strong>: より直感的で効率的なコーディング環境の実現</li>
                     </ul>
 
-                    <h3>将来性</h3>
+                    <h3>今後の展望</h3>
                     <div class="highlight">
                         <ul>
-                            <li><strong>汎用AIエージェント</strong>: 単なるコーディングエージェントを超えた汎用的なインテリジェンス</li>
-                            <li><strong>自動化革命</strong>: 複雑なインフラ要件を数分で実装可能な変革的能力</li>
-                            <li><strong>マルチモーダル統合</strong>: 健康データ分析から構造化データ抽出まで多様な応用</li>
+                            <li><strong>専門性の向上</strong>: より高度で特化したサブエージェントの開発</li>
+                            <li><strong>統合の拡大</strong>: さまざまな開発ツールとの連携強化</li>
+                            <li><strong>ワークフロー最適化</strong>: 開発プロセス全体の効率化と自動化</li>
                         </ul>
                     </div>
                 </section>
@@ -808,13 +814,11 @@ tools: Read, Grep  # 必要最小限に限定</code></pre>
                 <section>
                     <h2>まとめ</h2>
                     <div class="highlight">
-                        <p>Claude Code の <code>/agents</code> 機能は、2025年において開発ワークフローの根本的変革をもたらす技術として確立されています。単純なコード補完を超えて、複雑なマルチエージェントワークフロー、並列タスク処理、専門分野の専門知識を組み合わせた包括的な開発プラットフォームとして進化しています。</p>
+                        <p>Claude Code の <code>/agents</code> 機能は、開発ワークフローを大幅に効率化する強力なツールです。専門的なAIサブエージェントにより、コードレビュー、テスト自動化、パフォーマンス最適化、セキュリティ分析など、あらゆる開発タスクを専門家レベルで自動化できます。</p>
                         
-                        <p>専門的なAIアシスタントを通じて開発ワークフローを大幅に効率化する強力なツールです。適切な設計と実装により、コードレビュー、テスト自動化、パフォーマンス最適化、セキュリティ分析など、あらゆる開発タスクを専門家レベルで自動化できます。</p>
+                        <p>適切な設計と実装により、プロジェクトの要件に応じてカスタマイズされたエージェントを作成し、チーム全体での一貫した品質と効率性を実現することが可能になります。</p>
                         
-                        <p>MCP統合、サブエージェント並列処理、カスタムコマンド作成により、開発者は前例のない効率性と自動化を実現できるようになっています。適切な理解と実装により、従来の開発プロセスを大幅に加速し、より高度で複雑なタスクへの対応が可能となります。</p>
-                        
-                        <p>プロジェクトの要件に応じてカスタマイズされたエージェントを作成し、チーム全体での一貫した品質と効率性を実現することが可能になります。</p>
+                        <p>MCP統合やサブエージェント活用により、開発者は従来のコーディングプロセスを大幅に加速し、より高度で複雑なタスクに集中できるようになります。</p>
                     </div>
                 </section>
             </main>
