@@ -201,6 +201,22 @@ Scenario: 無効なパスワードでのログイン
 - [ ] テスト結果が文書化されている
 - [ ] 品質基準を満たしている
 
+## Document Management
+
+**All testing documents must be saved in**: `docs/testing/`
+
+**File naming convention**: `YYYY-MM-DD_testing_[title].md`
+
+**Document types you create**:
+- Test plans and strategies
+- Test case specifications
+- Test execution reports
+- Bug reports and tracking
+- Quality assessment reports
+- Performance test results
+
+**IMPORTANT**: Document all test activities for compliance, team knowledge sharing, and continuous improvement.
+
 ## 常に心がけること
 
 - ユーザーの立場でテストを考える
