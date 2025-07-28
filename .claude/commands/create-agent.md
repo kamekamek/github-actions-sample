@@ -1,89 +1,123 @@
 ---
 name: create-agent
-description: 新しいサブエージェントを対話的に作成します。エージェント名、説明、役割、使用ツール、専門分野を指定して、適切なフォーマットでエージェントファイルを生成します。
+description: 組織エージェント最小構成を自動生成します。4-9の最適役割集合を生成し、CLAUDE.md更新、エージェントファイル作成、チャット基盤準備を実行。
 ---
 
-新しいClaude Codeサブエージェントを作成します。以下の質問に答えてください：
+# 組織エージェント最小構成 生成コマンド
 
-## エージェント基本情報の収集
+本コマンドは、プロジェクト要件に基づいて **最小必須構成** を自動生成します。  
+生成対象は以下の3点のみ：
 
-**エージェント名を入力してください（例: data-analyst, security-expert, ui-designer）：**
-{agent_name}
-
-**エージェントの説明を入力してください：**
-{agent_description}
-
-**主な責任・役割を入力してください：**
-{main_responsibilities}
-
-**使用するツールを選択してください（カンマ区切り）：**
-選択肢: TodoWrite, WebSearch, Read, Write, Edit, Bash, Grep, Glob
-{selected_tools}
-
-**専門分野・特徴を入力してください：**
-{specialization}
-
-**表示色を選択してください：**
-選択肢: purple, blue, green, red, orange, yellow
-{agent_color}
+1. `.claude/agents/{role}.md` … 4-9の最適役割
+2. `CLAUDE.md` … 更新・統合
+3. `.claude/chat/` … 会話履歴・チャット基盤（既存の場合は更新なし）
 
 ---
 
-## エージェントファイル生成
+## 自動判断による役割設計
 
-以下のフォーマットで `.claude/agents/{agent_name}.md` を作成します：
+以下の基準で **4-9の最適役割集合** を自動提案・生成：
 
+- **職能の重複を避けた責務境界**
+- **セキュリティ・品質・運用** の視点を必ず含有
+- **ドメイン特化** 要素の適切な配置
+- **倫理/法令/プライバシー** ガードレール組み込み
+
+### 生成される標準役割例
+- **CEO**: 戦略・意思決定・組織調整
+- **CTO**: 技術アーキテクチャ・開発統括
+- **PM**: プロジェクト管理・進捗調整
+- **Frontend/Backend Developer**: 実装担当
+- **QA Engineer**: 品質保証・テスト
+- **Security Specialist**: セキュリティ・コンプライアンス
+- **DevOps**: 運用・インフラ・デプロイ
+
+---
+
+## 生成手順
+
+1. **現在の組織構成を分析**
+2. **不足役割・重複を特定**
+3. **最適4-9役割集合を決定**
+4. **CLAUDE.md統合更新**
+5. **各エージェントファイル生成**
+6. **チャット基盤作成**
+
+---
+
+## エージェントファイル仕様
+
+### Frontmatter
 ```yaml
 ---
-name: {agent_name}
-description: {agent_description}
-tools: {selected_tools}
-color: {agent_color}
-priority: high
-context_mode: minimal
+name: <role-id>
+description: <1行説明> # "Use PROACTIVELY for ..." 形式推奨
+color: <color>         # blue, indigo, green, red等
+tools: <tools>         # Read, Write, Edit, Bash, WebSearch等
+---
+```
+
+### 本文構成
+```markdown
+# 役割要約
+# 人物像（背景・価値観・強み）
+# 責務（詳細）
+# 主要シナリオ（3-6項目）
+# ツールと権限
+# セキュリティと法令順守
+# コミュニケーションスタイル（チーム会話参加を含む）
+# 成功条件・KPI
+```
+
 ---
 
-You are a {agent_name} for AI Virtual Corporation. 
+## CLAUDE.md更新内容
 
-## Your Core Responsibilities
-{main_responsibilities}
+- **プロジェクト概要**更新
+- **原則**（5-8項目）統合
+- **共通オペレーション**テンプレート
+- **セキュリティ・プライバシー**方針
+- **評価ポリシー**統合
+- **チャット・会話履歴**管理方針追加
 
-## Your Specialization
-{specialization}
+---
 
-## How You Operate
-- Always use TodoWrite to track and manage tasks
-- Focus on {specialization}
-- Collaborate effectively with other agents
-- Document important decisions and processes
+## 安全機能
 
-## Document Management
-**Save your work in**: `docs/{specialization}/`
-**File naming**: `YYYY-MM-DD_{agent_name}_[title].md`
+- **バックアップ**: 既存ファイルを `.bak` 保存
+- **差分確認**: 生成前に変更内容表示
+- **個人情報保護**: 機密情報の自動伏字
+- **整合性チェック**: 役割重複・漏れの検証
 
-## Communication Style
-- Professional and focused on {specialization}
-- Clear and actionable recommendations
-- Collaborative approach with team members
+---
 
-Remember: You are part of a larger AI organization. Always consider how your work contributes to the overall mission and collaborate effectively with other specialized agents.
-```
-
-## 使用例
+## 実行方法
 
 ```bash
-# コマンド実行
 /create-agent
-
-# 対話例
-エージェント名: data-analyst
-説明: データ分析とビジネスインサイト提供の専門エージェント
-主な責任: データ収集、分析、可視化、レポート作成
-使用ツール: TodoWrite, WebSearch, Read, Write, Bash
-専門分野: データサイエンス、統計分析、BI
-表示色: blue
-
-# 結果: .claude/agents/data-analyst.md が生成される
 ```
 
-このコマンドにより、組織に必要な新しい専門エージェントを簡単に追加できます。
+**対話不要**: 現在の構成を分析し、最適構成を自動生成
+
+---
+
+## 出力例
+
+```
+### 生成完了
+status: success
+roles_count: 7
+files:
+  - CLAUDE.md (updated)
+  - .claude/agents/ceo.md
+  - .claude/agents/cto.md
+  - .claude/agents/project-manager.md
+  - .claude/agents/frontend-developer.md
+  - .claude/agents/backend-developer.md
+  - .claude/agents/qa-engineer.md
+  - .claude/agents/security-specialist.md
+  - .claude/chat/team-chat.md
+  - .claude/chat/chat-participation-template.md
+```
+
+このコマンドにより、プロジェクトに最適化された組織構成が自動生成されます。

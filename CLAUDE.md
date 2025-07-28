@@ -16,10 +16,16 @@ AIとの協働により、人類の創造性と生産性を最大化する
 - **開発者**: Frontend/Backend/QA実装
 - **Deep Researcher**: 調査・分析
 
+## 💬 会話・履歴管理
+- **チーム会話**: `.claude/chat/team-chat.md` - 重要な組織決定を記録
+- **個別作業**: 各エージェントの作業は対応するdocsフォルダに記録
+- **参加ガイドライン**: `.claude/chat/chat-participation-template.md` 参照
+
 ## 📁 ファイル管理
 - **戦略文書**: `docs/strategy/YYYY-MM-DD_strategy_[タイトル].md`
 - **プロジェクト**: `docs/projects/YYYY-MM-DD_[プロジェクト名]_[内容].md`
 - **反省文**: `docs/postmortem/YYYY-MM-DD_[問題名]_postmortem.md`
+- **チーム会話**: `.claude/chat/team-chat.md` - 組織の重要な決定・会話を記録
 
 ## 📝 反省文フォーマット（必須）
 ```markdown
@@ -57,7 +63,7 @@ AIとの協働により、人類の創造性と生産性を最大化する
 ```bash
 # 基本パターン
 /agents ceo "新プロジェクトの戦略策定"
-/agents project-manager "タスク分解と計画"
+/agents project-manager "タスク分解と計画"  
 /agents frontend-developer "UI実装"
 
 # 問題発生時
@@ -65,6 +71,18 @@ AIとの協働により、人類の創造性と生産性を最大化する
 # 2. 問題解決後、必ず反省文を作成
 # 3. docs/postmortem/ に保存
 ```
+
+## 💬 会話・履歴記録ルール
+### 記録対象
+- **組織の重要決定**: `.claude/chat/team-chat.md` に記録
+- **技術的判断**: 担当エージェントがdocs/内に記録
+- **プロジェクト進捗**: PM が docs/projects/ に記録
+
+### 記録タイミング
+- エージェント間で重要な合意があった時
+- 戦略・方針の変更があった時
+- 大きな技術的決定があった時
+- 問題・課題の解決策が決まった時
 
 ## 🚫 禁止事項
 - 機密情報の処理
