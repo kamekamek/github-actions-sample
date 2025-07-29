@@ -9,7 +9,6 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import ora from 'ora';
 import { writeFileSync } from 'fs';
 import { GitHubApiClient } from './api/github.js';
 import { ProjectAnalyzer } from './core/analyzer.js';
@@ -17,6 +16,7 @@ import { createGitHubConfig, createDefaultAnalysisConfig, validateEnvironment } 
 import { TrackerOptions, ProjectAnalysis } from './types/index.js';
 import { CLIFormatter } from './cli/formatter.js';
 import { ProgressManager } from './cli/progress.js';
+import { securityValidator, validate } from './security/validator.js';
 
 /**
  * CLIプログラムのメイン関数
@@ -110,7 +110,7 @@ async function main(): Promise<void> {
 /**
  * 初期化コマンドの実行
  */
-async function runInitCommand(repository: string, options: any): Promise<void> {
+async function runInitCommand(repository: string, _options: any): Promise<void> {
   const progress = new ProgressManager('プロジェクト初期化', [
     'リポジトリ情報の取得',
     'API接続テスト',
@@ -348,10 +348,20 @@ function displayApiUsage(apiClient: GitHubApiClient): void {
 
 /**
  * リポジトリ名の解析
- * セキュリティファーストで実装
+ * セキュリティ強化 - より厳密な検証と脅威検出
  */
 function parseRepository(repository: string): [string, string] {
-  const parts = repository.split('/');
+  // 入力の正規化
+  const normalizedRepo = securityValidator.normalizeInput(repository);
+  
+  // GitHubリポジトリ形式の検証
+  const repoErrors = validate.githubRepo(normalizedRepo);
+  if (repoErrors.length > 0) {
+    const errorMessages = repoErrors.map(e => e.message).join(', ');
+    throw new Error(`セキュリティファーストで: リポジトリ名の検証に失敗しました - ${errorMessages}`);
+  }
+
+  const parts = normalizedRepo.split('/');
   
   if (parts.length !== 2) {
     throw new Error('リポジトリは "owner/repo" の形式で指定してください');
@@ -359,13 +369,11 @@ function parseRepository(repository: string): [string, string] {
 
   const [owner, repo] = parts;
   
-  // セキュリティ: 不正な文字をチェック
-  const validPattern = /^[a-zA-Z0-9\-_.]+$/;
-  if (!validPattern.test(owner) || !validPattern.test(repo)) {
-    throw new Error('セキュリティファーストで: リポジトリ名に不正な文字が含まれています');
-  }
+  // 個別にサニタイズ
+  const sanitizedOwner = securityValidator.sanitizeString(owner, { removeSpecialChars: true });
+  const sanitizedRepo = securityValidator.sanitizeString(repo, { removeSpecialChars: true });
 
-  return [owner, repo];
+  return [sanitizedOwner, sanitizedRepo];
 }
 
 /**
@@ -392,16 +400,33 @@ async function outputResults(analysis: ProjectAnalysis, options: TrackerOptions)
 
 /**
  * JSON形式での出力
+ * セキュリティ強化 - ファイル名検証と安全な出力
  */
 async function outputJson(analysis: ProjectAnalysis, outputFile?: string): Promise<void> {
   const json = JSON.stringify(analysis, null, 2);
   
   if (outputFile) {
+    // ファイル名の検証
+    const filenameErrors = validate.filename(outputFile);
+    if (filenameErrors.length > 0) {
+      console.error(chalk.red('⚠️ ファイル名セキュリティエラー:'), filenameErrors[0].message);
+      console.log('標準出力に出力します:');
+      console.log(json);
+      return;
+    }
+
     try {
-      writeFileSync(outputFile, json, 'utf8');
+      // 安全なファイル出力
+      writeFileSync(outputFile, json, { encoding: 'utf8', mode: 0o644 });
       console.log(chalk.green(`\n✅ JSONレポートを出力しました: ${outputFile}`));
+      
+      // ファイルサイズの確認
+      const fileSize = Buffer.byteLength(json, 'utf8');
+      if (fileSize > 1024 * 1024) { // 1MB以上
+        console.log(chalk.yellow(`📊 出力ファイルサイズ: ${(fileSize / 1024 / 1024).toFixed(2)}MB`));
+      }
     } catch (error) {
-      console.error(chalk.red('ファイル出力エラー:'), error);
+      console.error(chalk.red('🚨 ファイル出力エラー:'), error);
       console.log('\n標準出力に出力します:');
       console.log(json);
     }
@@ -410,83 +435,36 @@ async function outputJson(analysis: ProjectAnalysis, outputFile?: string): Promi
   }
 }
 
-/**
- * テーブル形式での出力
- */
-function outputTable(analysis: ProjectAnalysis): void {
-  console.log(chalk.bold.blue(`\n🔍 ${analysis.repository} - プロジェクト分析結果`));
-  console.log(chalk.gray(`分析期間: ${analysis.time_range.start.toLocaleDateString()} 〜 ${analysis.time_range.end.toLocaleDateString()}`));
-  console.log(chalk.gray(`分析日時: ${analysis.analysis_date.toLocaleString()}`));
-
-  // ヘルススコア
-  const healthColor = analysis.health_score >= 80 ? 'green' : 
-                     analysis.health_score >= 60 ? 'yellow' : 'red';
-  console.log(chalk.bold(`\n📊 プロジェクト健康度: ${chalk[healthColor](analysis.health_score + '/100')}`));
-
-  // コミット情報
-  console.log(chalk.bold('\n📝 コミット統計:'));
-  console.log(`  総コミット数: ${chalk.cyan(analysis.metrics.commits.total.toLocaleString())}`);
-  console.log(`  1日平均: ${chalk.cyan(analysis.metrics.commits.average_per_day.toFixed(1))}`);
-  console.log(`  アクティブコントリビューター: ${chalk.cyan(analysis.metrics.contributors.active_last_30_days)}`);
-
-  // プルリクエスト情報
-  console.log(chalk.bold('\n🔄 プルリクエスト統計:'));
-  console.log(`  総PR数: ${chalk.cyan(analysis.metrics.pull_requests.total)}`);
-  console.log(`  マージ済み: ${chalk.green(analysis.metrics.pull_requests.merged)}`);
-  console.log(`  オープン中: ${chalk.yellow(analysis.metrics.pull_requests.open)}`);
-  console.log(`  平均マージ時間: ${chalk.cyan(analysis.metrics.pull_requests.average_merge_time_hours.toFixed(1))}時間`);
-
-  // イシュー情報
-  console.log(chalk.bold('\n🐛 イシュー統計:'));
-  console.log(`  総イシュー数: ${chalk.cyan(analysis.metrics.issues.total)}`);
-  console.log(`  解決済み: ${chalk.green(analysis.metrics.issues.closed)}`);
-  console.log(`  未解決: ${chalk.yellow(analysis.metrics.issues.open)}`);
-  console.log(`  平均解決時間: ${chalk.cyan(analysis.metrics.issues.resolution_time_average_hours.toFixed(1))}時間`);
-
-  // コード変更統計
-  console.log(chalk.bold('\n📈 コード変更統計:'));
-  console.log(`  追加行数: ${chalk.green('+' + analysis.metrics.code_changes.total_additions.toLocaleString())}`);
-  console.log(`  削除行数: ${chalk.red('-' + analysis.metrics.code_changes.total_deletions.toLocaleString())}`);
-  console.log(`  コミット平均行数: ${chalk.cyan(analysis.metrics.code_changes.lines_per_commit_average.toFixed(1))}`);
-
-  // トレンド情報
-  console.log(chalk.bold('\n📊 トレンド分析:'));
-  console.log(`  アクティビティ: ${getTrendEmoji(analysis.trends.activity_trend)} ${analysis.trends.activity_trend}`);
-  console.log(`  開発速度: ${getTrendEmoji(analysis.trends.velocity_trend)} ${analysis.trends.velocity_trend}`);
-  console.log(`  イシュー解決: ${getTrendEmoji(analysis.trends.issue_resolution_trend)} ${analysis.trends.issue_resolution_trend}`);
-  console.log(`  コントリビューター: ${getTrendEmoji(analysis.trends.contributor_engagement)} ${analysis.trends.contributor_engagement}`);
-
-  // 推奨事項
-  if (analysis.recommendations.length > 0) {
-    console.log(chalk.bold('\n💡 推奨事項:'));
-    analysis.recommendations.forEach((recommendation, index) => {
-      console.log(`  ${index + 1}. ${recommendation}`);
-    });
-  }
-
-  // トップコントリビューター
-  if (analysis.metrics.contributors.top_contributors.length > 0) {
-    console.log(chalk.bold('\n🏆 トップコントリビューター:'));
-    analysis.metrics.contributors.top_contributors.slice(0, 5).forEach((contributor, index) => {
-      console.log(`  ${index + 1}. ${chalk.cyan(contributor.name)} - ${contributor.commits}コミット`);
-    });
-  }
-
-  console.log(chalk.gray(`\nデータ整合性ハッシュ: ${analysis.data_integrity_hash}`));
-}
 
 /**
  * Markdown形式での出力
+ * セキュリティ強化 - ファイル名検証と安全な出力
  */
 async function outputMarkdown(analysis: ProjectAnalysis, outputFile?: string): Promise<void> {
   const markdown = generateMarkdownReport(analysis);
   
   if (outputFile) {
+    // ファイル名の検証
+    const filenameErrors = validate.filename(outputFile);
+    if (filenameErrors.length > 0) {
+      console.error(chalk.red('⚠️ ファイル名セキュリティエラー:'), filenameErrors[0].message);
+      console.log('標準出力に出力します:');
+      console.log(markdown);
+      return;
+    }
+
     try {
-      writeFileSync(outputFile, markdown, 'utf8');
+      // 安全なファイル出力
+      writeFileSync(outputFile, markdown, { encoding: 'utf8', mode: 0o644 });
       console.log(chalk.green(`\n✅ Markdownレポートを出力しました: ${outputFile}`));
+      
+      // ファイルサイズの確認
+      const fileSize = Buffer.byteLength(markdown, 'utf8');
+      if (fileSize > 1024 * 1024) { // 1MB以上
+        console.log(chalk.yellow(`📊 出力ファイルサイズ: ${(fileSize / 1024 / 1024).toFixed(2)}MB`));
+      }
     } catch (error) {
-      console.error(chalk.red('ファイル出力エラー:'), error);
+      console.error(chalk.red('🚨 ファイル出力エラー:'), error);
       console.log('\n標準出力に出力します:');
       console.log(markdown);
     }
@@ -537,27 +515,6 @@ ${analysis.recommendations.map(rec => `- ${rec}`).join('\n')}
 `;
 }
 
-/**
- * トレンド表示用絵文字取得
- */
-function getTrendEmoji(trend: string): string {
-  switch (trend) {
-    case 'increasing':
-    case 'accelerating':
-    case 'improving':
-    case 'growing':
-      return '📈';
-    case 'decreasing':
-    case 'decelerating':
-    case 'degrading':
-    case 'shrinking':
-      return '📉';
-    case 'stable':
-    case 'consistent':
-    default:
-      return '➡️';
-  }
-}
 
 // メイン関数実行
 if (import.meta.url === `file://${process.argv[1]}`) {

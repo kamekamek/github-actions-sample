@@ -19,7 +19,7 @@ export class CLIFormatter {
    * ステータス表示（簡潔版）
    * 日々の確認に適した軽量な情報表示
    */
-  displayStatus(analysis: ProjectAnalysis, options: any = {}): void {
+  displayStatus(analysis: ProjectAnalysis, _options: any = {}): void {
     console.log(chalk.bold.blue(`\n📊 ${analysis.repository} - 現在のステータス`));
     console.log(chalk.gray(`分析期間: ${analysis.time_range.start.toLocaleDateString()} ～ ${analysis.time_range.end.toLocaleDateString()}`));
     
