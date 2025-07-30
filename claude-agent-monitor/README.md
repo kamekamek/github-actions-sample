@@ -105,11 +105,24 @@ src/
 ### 環境変数
 
 ```bash
-# 詳細ログを有効化
+# 環境変数で設定
+export CLAUDE_PROJECTS_DIR=/custom/path/to/claude/projects
 export VERBOSE=true
-
-# デバッグモードを有効化
 export DEBUG=true
+```
+
+### .envファイル
+
+プロジェクトルートに`.env`ファイルを作成して設定することも可能です：
+
+```bash
+# .envファイルをサンプルからコピー
+cp .env.example .env
+
+# .envファイルを編集
+# CLAUDE_PROJECTS_DIR=/custom/path/to/claude/projects
+# VERBOSE=true
+# DEBUG=true
 ```
 
 ### データストレージ

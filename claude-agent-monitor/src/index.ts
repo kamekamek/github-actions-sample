@@ -4,7 +4,13 @@
  * セキュリティファーストで高性能なエージェント監視を提供
  */
 
+// Load environment variables from .env file
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { Command } from 'commander';
+import os from 'os';
+import path from 'path';
 import chalk from 'chalk';
 import ora from 'ora';
 import Table from 'cli-table3';
@@ -36,9 +42,6 @@ class ClaudeAgentMonitor {
   constructor(options: CLIOptions) {
     const workingDirectory = options.logPath || process.cwd();
     
-    // Claude projects directory path for the current working directory
-    const claudeProjectsPath = ClaudeLogParser.getClaudeProjectsPath(workingDirectory);
-    
     // セキュリティファーストでコンポーネントを初期化
     this.dataManager = new DataManager({
       baseDirectory: `${workingDirectory}/.agent-monitor-data`,
@@ -48,7 +51,16 @@ class ClaudeAgentMonitor {
     });
     
     this.sessionAnalyzer = new SessionAnalyzer(this.dataManager);
-    this.logParser = new ClaudeLogParser(claudeProjectsPath);
+    
+    // Support environment variable for Claude projects directory
+    let claudeProjectsDir = process.env.CLAUDE_PROJECTS_DIR;
+    
+    // Expand tilde (~) to home directory if present
+    if (claudeProjectsDir && claudeProjectsDir.startsWith('~/')) {
+      claudeProjectsDir = claudeProjectsDir.replace('~', os.homedir());
+    }
+    
+    this.logParser = new ClaudeLogParser(claudeProjectsDir);
   }
 
   /**
@@ -61,9 +73,18 @@ class ClaudeAgentMonitor {
       // データマネージャーを初期化
       await this.dataManager.initialize();
       
+      // Claude projects directory for monitoring
+      let claudeProjectsDir = process.env.CLAUDE_PROJECTS_DIR;
+      if (claudeProjectsDir && claudeProjectsDir.startsWith('~/')) {
+        claudeProjectsDir = claudeProjectsDir.replace('~', os.homedir());
+      }
+      if (!claudeProjectsDir) {
+        claudeProjectsDir = path.join(os.homedir(), '.claude', 'projects');
+      }
+      
       // エージェントトラッカーを作成
       this.agentTracker = AgentTrackerFactory.create(
-        options.logPath || process.cwd(),
+        claudeProjectsDir,
         this.dataManager,
         {
           enableRealTimeMetrics: true,
@@ -108,6 +129,15 @@ class ClaudeAgentMonitor {
     try {
       await this.dataManager.initialize();
       
+      // Claude Codeログからセッションデータを取得
+      const sessions = await this.logParser.parseSessionLogs();
+      spinner.text = `${sessions.length}件のセッションを解析中...`;
+      
+      // セッションデータをDataManagerに保存
+      for (const session of sessions) {
+        await this.dataManager.saveSession(session);
+      }
+      
       // フィルター条件を構築
       const filters = this.buildFilters(options);
       
@@ -134,6 +164,14 @@ class ClaudeAgentMonitor {
     try {
       await this.dataManager.initialize();
       
+      // Claude Codeログからセッションデータを取得
+      const sessions = await this.logParser.parseSessionLogs();
+      
+      // セッションデータをDataManagerに保存
+      for (const session of sessions) {
+        await this.dataManager.saveSession(session);
+      }
+      
       const timeRange = this.parseTimeRange(options.timeRange);
       const comparison = await this.sessionAnalyzer.compareAgents(agentIds, timeRange);
       
@@ -155,15 +193,29 @@ class ClaudeAgentMonitor {
     const spinner = ora('セッション履歴を取得中...').start();
     
     try {
-      await this.dataManager.initialize();
+      // Claude Codeログから直接セッションデータを取得
+      const sessions = await this.logParser.parseSessionLogs();
       
+      // フィルター適用
       const filters = this.buildFilters(options);
-      const sessions = await this.dataManager.getSessions(filters);
+      let filteredSessions = sessions;
       
-      spinner.succeed(`${sessions.length}件のセッションを取得`);
+      if (filters?.agents) {
+        filteredSessions = sessions.filter(s => 
+          s.agents.some(a => filters.agents!.includes(a.agentType))
+        );
+      }
+      
+      if (filters?.timeRange) {
+        filteredSessions = filteredSessions.filter(s => 
+          s.startTime >= filters.timeRange!.start && s.startTime <= filters.timeRange!.end
+        );
+      }
+      
+      spinner.succeed(`${filteredSessions.length}件のセッションを取得`);
       
       // セッション一覧を表示
-      this.displaySessionList(sessions, options);
+      this.displaySessionList(filteredSessions, options);
       
     } catch (error) {
       spinner.fail(`セッション取得エラー: ${error}`);
@@ -180,7 +232,16 @@ class ClaudeAgentMonitor {
     try {
       await this.dataManager.initialize();
       
+      // Claude Codeログから統計データを取得
+      const sessions = await this.logParser.parseSessionLogs();
+      spinner.text = `${sessions.length}件のセッションを分析中...`;
+      
       const storageMetrics = this.dataManager.getStorageMetrics();
+      
+      // セッション統計を計算
+      const sessionsWithAgents = sessions.filter(s => s.agents.length > 0);
+      const totalAgentActivities = sessions.reduce((sum, s) => sum + s.agents.length, 0);
+      const agentTypes = new Set(sessions.flatMap(s => s.agents.map(a => a.agentType)));
       
       // トラッカーが動作中の場合はトラッキング統計も取得
       let trackingStatus: any = null;
@@ -193,8 +254,14 @@ class ClaudeAgentMonitor {
       
       spinner.succeed('統計取得完了');
       
-      // 統計を表示
-      this.displaySystemStats(storageMetrics, trackingStatus, performanceMetrics);
+      // 統計を表示（セッション統計も含む）
+      this.displaySystemStats(storageMetrics, trackingStatus, performanceMetrics, {
+        totalSessions: sessions.length,
+        sessionsWithAgents: sessionsWithAgents.length,
+        totalAgentActivities,
+        uniqueAgentTypes: agentTypes.size,
+        agentTypes: Array.from(agentTypes)
+      });
       
     } catch (error) {
       spinner.fail(`統計取得エラー: ${error}`);
@@ -543,7 +610,8 @@ class ClaudeAgentMonitor {
   private displaySystemStats(
     storageMetrics: any,
     trackingStatus: any,
-    performanceMetrics: any
+    performanceMetrics: any,
+    sessionStats?: any
   ): void {
     console.log(chalk.blue('\n📈 システム統計\n'));
     
@@ -563,6 +631,26 @@ class ClaudeAgentMonitor {
     );
     
     console.log(storageTable.toString());
+    
+    // セッション統計（利用可能な場合）
+    if (sessionStats) {
+      console.log('\n' + chalk.green('📊 セッション統計'));
+      
+      const sessionTable = new Table({
+        head: ['項目', '値'],
+        style: { head: ['green'] }
+      });
+      
+      sessionTable.push(
+        ['総セッション数', sessionStats.totalSessions.toString()],
+        ['エージェント活動セッション', sessionStats.sessionsWithAgents.toString()],
+        ['総エージェント活動数', sessionStats.totalAgentActivities.toString()],
+        ['エージェント種類', sessionStats.uniqueAgentTypes.toString()],
+        ['利用エージェント', sessionStats.agentTypes.slice(0, 5).join(', ') + (sessionStats.agentTypes.length > 5 ? '...' : '')]
+      );
+      
+      console.log(sessionTable.toString());
+    }
     
     // トラッキング統計（実行中の場合）
     if (trackingStatus) {
