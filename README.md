@@ -13,16 +13,14 @@ graph TD
     FE[Frontend Developer<br/>UI実装<br/>🎨]
     BE[Backend Developer<br/>API・DB実装<br/>⚙️]
     QA[QA Engineer<br/>品質保証<br/>🧪]
-    SEC[Security Specialist<br/>セキュリティ・AI安全性<br/>🛡️]
     DR[Deep Researcher<br/>調査・分析<br/>🔍]
     
     CEO --> CTO
-    CTO --> PM
-    PM --> FE
-    PM --> BE
+    CEO --> PM
+    CTO --> FE
+    CTO --> BE
     PM --> QA
-    CTO --> SEC
-    CEO --> DR
+    PM --> DR
     
     style CEO fill:#ff9999
     style CTO fill:#99ccff
@@ -30,7 +28,6 @@ graph TD
     style FE fill:#ffcc99
     style BE fill:#ffcc99
     style QA fill:#cc99ff
-    style SEC fill:#ff6666
     style DR fill:#ffff99
 ```
 
