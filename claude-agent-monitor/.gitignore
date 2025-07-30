@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Runtime files
+*.log
+*.pid
+*.pid.lock
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDEs and editors  
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Claude Agent Monitor specific
+claude-monitor-data/
+.agent-monitor-data/
+*.claude-monitor
+.encryption-key
+
+# Test coverage
+coverage/
+*.lcov
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+.temp/
+
+# Package lock files (choose one)
+package-lock.json
+# yarn.lock
+
+# Runtime generated files
+analysis.json
+report.json
+monitoring.log
+debug.log

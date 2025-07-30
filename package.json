@@ -1,0 +1,63 @@
+{
+  "name": "claude-agent-monitor",
+  "version": "1.0.0",
+  "description": "Claude Code Agent Activity Monitoring CLI",
+  "main": "src/index.js",
+  "bin": {
+    "claude-monitor": "./bin/claude-monitor.js"
+  },
+  "scripts": {
+    "start": "node bin/claude-monitor.js",
+    "dev": "nodemon bin/claude-monitor.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/ tests/",
+    "lint:fix": "eslint src/ tests/ --fix",
+    "build": "npm run test && npm run lint",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "claude",
+    "ai",
+    "monitoring",
+    "cli",
+    "agent",
+    "analytics"
+  ],
+  "author": "AI Virtual Corporation",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^9.4.1",
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "chokidar": "^3.5.3",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1",
+    "inquirer": "^8.2.5",
+    "table": "^6.8.1",
+    "chart.js": "^3.9.1",
+    "date-fns": "^2.29.3",
+    "lodash": "^4.17.21",
+    "crypto-js": "^4.1.1",
+    "joi": "^17.9.2"
+  },
+  "devDependencies": {
+    "jest": "^29.6.2",
+    "nodemon": "^3.0.1",
+    "eslint": "^8.45.0",
+    "eslint-config-standard": "^17.1.0",
+    "supertest": "^6.3.3",
+    "@types/jest": "^29.5.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "config/",
+    "README.md",
+    "LICENSE"
+  ]
+}
