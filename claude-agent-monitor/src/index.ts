@@ -34,18 +34,21 @@ class ClaudeAgentMonitor {
   private logParser: ClaudeLogParser;
   
   constructor(options: CLIOptions) {
-    const logDirectory = options.logPath || process.cwd();
+    const workingDirectory = options.logPath || process.cwd();
+    
+    // Claude projects directory path for the current working directory
+    const claudeProjectsPath = ClaudeLogParser.getClaudeProjectsPath(workingDirectory);
     
     // セキュリティファーストでコンポーネントを初期化
     this.dataManager = new DataManager({
-      baseDirectory: `${logDirectory}/.agent-monitor-data`,
+      baseDirectory: `${workingDirectory}/.agent-monitor-data`,
       compression: true,
       encryption: false, // 本番環境では有効化を検討
       retentionDays: 30
     });
     
     this.sessionAnalyzer = new SessionAnalyzer(this.dataManager);
-    this.logParser = new ClaudeLogParser(logDirectory);
+    this.logParser = new ClaudeLogParser(claudeProjectsPath);
   }
 
   /**

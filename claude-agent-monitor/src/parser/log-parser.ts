@@ -1,174 +1,231 @@
 /**
- * Claude Code Log Parser
- * Claude Codeのセッションログを解析してエージェント活動を抽出
+ * Claude Code JSONL Log Parser
+ * Parses Claude Code JSONL logs to extract agent activities
  */
 
 import fs from 'fs-extra';
 import path from 'path';
+import os from 'os';
 import { ClaudeSession, AgentActivity, LogEntry, AgentType } from '../types/index.js';
 
+export interface JSONLLogEntry {
+  parentUuid: string | null;
+  isSidechain: boolean;
+  userType: string;
+  cwd: string;
+  sessionId: string;
+  version: string;
+  gitBranch: string;
+  type: 'user' | 'assistant' | 'system' | 'summary';
+  message?: {
+    id?: string;
+    type?: 'message';
+    role?: 'user' | 'assistant';
+    model?: string;
+    content?: Array<{
+      type: 'text' | 'tool_use' | 'tool_result';
+      id?: string;
+      name?: string;
+      text?: string;
+      input?: {
+        description?: string;
+        prompt?: string;
+        subagent_type?: string;
+        [key: string]: any;
+      };
+      [key: string]: any;
+    }>;
+    usage?: {
+      input_tokens: number;
+      cache_creation_input_tokens?: number;
+      cache_read_input_tokens?: number;
+      output_tokens: number;
+      service_tier?: string;
+    };
+    [key: string]: any;
+  };
+  content?: string;
+  uuid: string;
+  timestamp: string;
+  summary?: string;
+  leafUuid?: string;
+  toolUseID?: string;
+  [key: string]: any;
+}
+
 export class ClaudeLogParser {
-  private logDirectory: string;
-  
-  constructor(logDirectory: string) {
-    this.logDirectory = logDirectory;
+  private claudeProjectsDir: string;
+
+  constructor(projectPath?: string) {
+    if (projectPath) {
+      this.claudeProjectsDir = projectPath;
+    } else {
+      // Default Claude projects directory
+      const homeDir = os.homedir();
+      this.claudeProjectsDir = path.join(homeDir, '.claude', 'projects');
+    }
   }
 
   /**
-   * Claude Codeセッションログを解析
+   * Parse all Claude Code session logs
    */
   async parseSessionLogs(): Promise<ClaudeSession[]> {
     const sessions: ClaudeSession[] = [];
     
     try {
-      // .claude ディレクトリからチャット履歴を読み込み
-      const claudeDir = path.join(this.logDirectory, '.claude');
-      if (await fs.pathExists(claudeDir)) {
-        const chatSessions = await this.parseChatLogs(claudeDir);
-        sessions.push(...chatSessions);
-      }
-
-      // コマンド履歴から Task実行ログを解析
-      const taskLogs = await this.parseTaskLogs();
-      sessions.push(...taskLogs);
-
-      return sessions;
-    } catch (error) {
-      console.error('ログ解析エラー:', error);
-      return [];
-    }
-  }
-
-  /**
-   * チャット履歴から会話セッションを解析
-   */
-  private async parseChatLogs(claudeDir: string): Promise<ClaudeSession[]> {
-    const sessions: ClaudeSession[] = [];
-    
-    try {
-      const chatDir = path.join(claudeDir, 'chat');
-      if (!(await fs.pathExists(chatDir))) {
+      if (!(await fs.pathExists(this.claudeProjectsDir))) {
+        console.warn(`Claude projects directory ${this.claudeProjectsDir} not found`);
         return sessions;
       }
 
-      // 年/月のディレクトリ構造を走査
-      const years = await fs.readdir(chatDir);
+      // Find project directories (they contain the working directory path in their name)
+      const projectDirs = await fs.readdir(this.claudeProjectsDir);
       
-      for (const year of years) {
-        const yearPath = path.join(chatDir, year);
-        if (!(await fs.stat(yearPath)).isDirectory()) continue;
-
-        const months = await fs.readdir(yearPath);
+      for (const projectDir of projectDirs) {
+        const projectPath = path.join(this.claudeProjectsDir, projectDir);
+        const stat = await fs.stat(projectPath);
         
-        for (const month of months) {
-          const monthPath = path.join(yearPath, month);
-          if (!(await fs.stat(monthPath)).isDirectory()) continue;
+        if (!stat.isDirectory()) continue;
 
-          const chatFiles = await fs.readdir(monthPath);
-          
-          for (const file of chatFiles) {
-            if (file.endsWith('-team-chat.md')) {
-              const session = await this.parseTeamChatFile(path.join(monthPath, file));
-              if (session) sessions.push(session);
-            }
+        const jsonlFiles = (await fs.readdir(projectPath))
+          .filter(name => name.endsWith('.jsonl'));
+
+        for (const jsonlFile of jsonlFiles) {
+          const filePath = path.join(projectPath, jsonlFile);
+          const session = await this.parseJSONLFile(filePath);
+          if (session) {
+            sessions.push(session);
           }
         }
       }
     } catch (error) {
-      console.error('チャットログ解析エラー:', error);
+      console.error('Session parsing error:', error);
     }
 
-    return sessions;
+    return sessions.sort((a, b) => b.startTime.getTime() - a.startTime.getTime());
   }
 
   /**
-   * チームチャットファイルを解析してセッション情報を抽出
+   * Parse a single JSONL file
    */
-  private async parseTeamChatFile(filePath: string): Promise<ClaudeSession | null> {
+  private async parseJSONLFile(filePath: string): Promise<ClaudeSession | null> {
     try {
       const content = await fs.readFile(filePath, 'utf-8');
-      const fileName = path.basename(filePath);
+      const lines = content.trim().split('\n').filter(line => line.trim());
       
-      // ファイル名から日付を抽出 (YYYY-MM-DD_team-chat.md)
-      const dateMatch = fileName.match(/(\d{4}-\d{2}-\d{2})/);
-      if (!dateMatch) return null;
+      if (lines.length === 0) {
+        return null;
+      }
 
-      const sessionDate = new Date(dateMatch[1]);
-      const sessionId = `chat-${dateMatch[1]}`;
+      const entries: JSONLLogEntry[] = [];
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line) as JSONLLogEntry;
+          entries.push(entry);
+        } catch (parseError) {
+          console.warn(`Failed to parse JSONL line in ${filePath}:`, parseError);
+          continue;
+        }
+      }
 
-      // エージェント活動を抽出
-      const activities = this.extractAgentActivitiesFromChat(content, sessionDate);
+      if (entries.length === 0) {
+        return null;
+      }
+
+      // Find first entry with valid timestamp and sessionId
+      const firstEntryWithTimestamp = entries.find(e => e.timestamp && e.sessionId);
+      if (!firstEntryWithTimestamp) {
+        return null;
+      }
+      
+      const sessionId = firstEntryWithTimestamp.sessionId;
+      const startTime = new Date(firstEntryWithTimestamp.timestamp);
+      
+      // Extract agent activities from Task tool calls
+      const activities = this.extractAgentActivitiesFromJSONL(entries);
+
+      // Find last entry with valid timestamp
+      const lastEntryWithTimestamp = entries.slice().reverse().find(e => e.timestamp);
+      const endTime = lastEntryWithTimestamp ? new Date(lastEntryWithTimestamp.timestamp) : startTime;
 
       const session: ClaudeSession = {
         sessionId,
-        startTime: sessionDate,
-        endTime: new Date(sessionDate.getTime() + 24 * 60 * 60 * 1000), // 仮の終了時間
-        workingDirectory: path.dirname(filePath),
+        startTime,
+        endTime,
+        workingDirectory: firstEntryWithTimestamp.cwd,
         totalTasks: activities.length,
         completedTasks: activities.filter(a => a.success).length,
-        agents: activities
+        agents: activities,
+        metadata: {
+          version: firstEntryWithTimestamp.version,
+          gitBranch: firstEntryWithTimestamp.gitBranch,
+          totalEntries: entries.length,
+          sourceFile: filePath
+        }
       };
 
       return session;
     } catch (error) {
-      console.error(`チャットファイル解析エラー ${filePath}:`, error);
+      console.error(`File parsing error ${filePath}:`, error);
       return null;
     }
   }
 
   /**
-   * チャット内容からエージェント活動を抽出
+   * Extract agent activities from JSONL entries
    */
-  private extractAgentActivitiesFromChat(content: string, sessionDate: Date): AgentActivity[] {
+  private extractAgentActivitiesFromJSONL(entries: JSONLLogEntry[]): AgentActivity[] {
     const activities: AgentActivity[] = [];
-    
-    // エージェント発言パターンを検索
-    const agentPatterns = [
-      /\*\*CEO\*\*.*?として/g,
-      /\*\*CTO\*\*.*?として/g,
-      /\*\*Project Manager\*\*.*?として/g,
-      /\*\*Frontend Developer\*\*.*?として/g,
-      /\*\*Backend Developer\*\*.*?として/g,
-      /\*\*QA Engineer\*\*.*?として/g,
-      /\*\*AI Security Specialist\*\*.*?として/g,
-      /\*\*Deep Researcher\*\*.*?として/g
-    ];
+    let activityCounter = 0;
 
-    const agentTypeMap: Record<string, AgentType> = {
-      'CEO': 'ceo',
-      'CTO': 'cto',
-      'Project Manager': 'project-manager',
-      'Frontend Developer': 'frontend-developer',
-      'Backend Developer': 'backend-developer',
-      'QA Engineer': 'qa-engineer',
-      'AI Security Specialist': 'ai-security-specialist',
-      'Deep Researcher': 'deep-researcher'
-    };
+    for (const entry of entries) {
+      // Look for assistant messages with tool_use content
+      if (entry.type === 'assistant' && entry.message?.content) {
+        for (const contentItem of entry.message.content) {
+          // Check for Task tool calls with subagent_type
+          if (contentItem.type === 'tool_use' && 
+              contentItem.name === 'Task' && 
+              contentItem.input?.subagent_type) {
+            
+            const agentType = this.normalizeAgentType(contentItem.input.subagent_type);
+            if (!agentType) continue;
 
-    let taskCounter = 1;
+            const taskDescription = contentItem.input.description || 
+                                  contentItem.input.prompt?.substring(0, 100) || 
+                                  'Agent task execution';
 
-    for (const [agentName, agentType] of Object.entries(agentTypeMap)) {
-      const pattern = new RegExp(`\\*\\*${agentName}\\*\\*.*?として`, 'g');
-      const matches = content.match(pattern);
-      
-      if (matches) {
-        for (const match of matches) {
-          const activity: AgentActivity = {
-            agentId: agentType,
-            agentType,
-            taskId: `task-${sessionDate.toISOString().split('T')[0]}-${taskCounter++}`,
-            startTime: sessionDate,
-            endTime: new Date(sessionDate.getTime() + 60 * 60 * 1000), // 1時間後と仮定
-            duration: 3600, // 1時間 = 3600秒
-            status: 'completed',
-            inputTokens: this.estimateTokens(match),
-            outputTokens: this.estimateTokens(match) * 2, // 出力は入力の2倍と仮定
-            toolsUsed: this.extractToolsFromText(match),
-            files: [],
-            success: true
-          };
-          
-          activities.push(activity);
+            const startTime = new Date(entry.timestamp);
+            // Estimate end time (we don't have exact duration from logs)
+            const endTime = new Date(startTime.getTime() + (5 * 60 * 1000)); // 5 minutes default
+            const duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
+
+            const activity: AgentActivity = {
+              agentId: `${agentType}_${activityCounter}`,
+              agentType,
+              taskId: contentItem.id || `task_${activityCounter}`,
+              startTime,
+              endTime,
+              duration,
+              status: 'completed', // We assume completed since it's in the log
+              inputTokens: entry.message?.usage?.input_tokens || 0,
+              outputTokens: entry.message?.usage?.output_tokens || 0,
+              toolsUsed: ['Task'],
+              files: [],
+              success: true,
+              metadata: {
+                sessionId: entry.sessionId,
+                parentUuid: entry.parentUuid,
+                toolUseId: contentItem.id,
+                isSidechain: entry.isSidechain,
+                model: entry.message?.model,
+                fullPrompt: contentItem.input?.prompt,
+                taskDescription: taskDescription
+              }
+            };
+
+            activities.push(activity);
+            activityCounter++;
+          }
         }
       }
     }
@@ -177,80 +234,52 @@ export class ClaudeLogParser {
   }
 
   /**
-   * Task実行ログを解析（将来の実装用）
+   * Normalize agent type from subagent_type
    */
-  private async parseTaskLogs(): Promise<ClaudeSession[]> {
-    // Task実行の詳細ログがある場合の解析ロジック
-    // 現在は空の実装
-    return [];
+  private normalizeAgentType(subagentType: string): AgentType | null {
+    // Direct mapping from Claude Code subagent types
+    const typeMap: Record<string, AgentType> = {
+      'ceo': 'ceo',
+      'cto': 'cto',
+      'project-manager': 'project-manager',
+      'frontend-developer': 'frontend-developer',
+      'backend-developer': 'backend-developer',
+      'qa-engineer': 'qa-engineer',
+      'deep-researcher': 'deep-researcher',
+      'ai-security-specialist': 'ai-security-specialist',
+      'general-purpose': 'general-purpose'
+    };
+
+    return typeMap[subagentType] || null;
   }
 
   /**
-   * テキストからツールの使用を推定
-   */
-  private extractToolsFromText(text: string): string[] {
-    const tools: string[] = [];
-    
-    // ツール使用パターンを検索
-    if (text.includes('Read') || text.includes('読み取り')) tools.push('Read');
-    if (text.includes('Write') || text.includes('書き込み')) tools.push('Write');
-    if (text.includes('Edit') || text.includes('編集')) tools.push('Edit');
-    if (text.includes('Bash') || text.includes('コマンド')) tools.push('Bash');
-    if (text.includes('WebSearch') || text.includes('検索')) tools.push('WebSearch');
-    if (text.includes('TodoWrite') || text.includes('タスク')) tools.push('TodoWrite');
-    if (text.includes('Grep') || text.includes('検索')) tools.push('Grep');
-    if (text.includes('Glob') || text.includes('ファイル検索')) tools.push('Glob');
-
-    return [...new Set(tools)]; // 重複を除去
-  }
-
-  /**
-   * テキストの概算トークン数を計算
-   */
-  private estimateTokens(text: string): number {
-    // 1トークン ≈ 4文字として概算
-    return Math.ceil(text.length / 4);
-  }
-
-  /**
-   * ログエントリを解析してイベントを抽出
+   * Parse log entries from JSONL content
    */
   async parseLogEntries(logContent: string): Promise<LogEntry[]> {
     const entries: LogEntry[] = [];
-    const lines = logContent.split('\n');
+    const lines = logContent.split('\n').filter(line => line.trim());
 
     for (const line of lines) {
-      if (line.trim() === '') continue;
-
       try {
-        // タイムスタンプパターンを検索
-        const timestampMatch = line.match(/(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2})/);
-        if (!timestampMatch) continue;
-
-        const timestamp = new Date(timestampMatch[1]);
+        const jsonEntry = JSON.parse(line) as JSONLLogEntry;
         
-        // ログレベルを推定
-        let level: 'info' | 'warn' | 'error' | 'debug' = 'info';
-        if (line.toLowerCase().includes('error')) level = 'error';
-        else if (line.toLowerCase().includes('warn')) level = 'warn';
-        else if (line.toLowerCase().includes('debug')) level = 'debug';
-
-        // ソースを推定
-        let source: 'claude' | 'agent' | 'system' = 'system';
-        if (line.includes('Agent') || line.includes('エージェント')) source = 'agent';
-        else if (line.includes('Claude')) source = 'claude';
-
         const entry: LogEntry = {
-          timestamp,
-          level,
-          source,
-          message: line.trim(),
-          metadata: {}
+          timestamp: new Date(jsonEntry.timestamp),
+          level: this.determineLogLevel(jsonEntry),
+          source: this.determineSource(jsonEntry),
+          message: this.formatMessage(jsonEntry),
+          metadata: {
+            sessionId: jsonEntry.sessionId,
+            uuid: jsonEntry.uuid,
+            type: jsonEntry.type,
+            parentUuid: jsonEntry.parentUuid
+          }
         };
 
         entries.push(entry);
       } catch (error) {
-        // ログ行の解析に失敗した場合はスキップ
+        // Skip invalid JSON lines
         continue;
       }
     }
@@ -259,43 +288,128 @@ export class ClaudeLogParser {
   }
 
   /**
-   * 指定されたディレクトリを監視してリアルタイム解析
+   * Determine log level from JSONL entry
+   */
+  private determineLogLevel(entry: JSONLLogEntry): 'info' | 'warn' | 'error' | 'debug' {
+    if (entry.type === 'system') return 'debug';
+    if (entry.content?.toLowerCase().includes('error')) return 'error';
+    if (entry.content?.toLowerCase().includes('warn')) return 'warn';
+    return 'info';
+  }
+
+  /**
+   * Determine source from JSONL entry
+   */
+  private determineSource(entry: JSONLLogEntry): 'claude' | 'agent' | 'system' {
+    if (entry.type === 'system') return 'system';
+    if (entry.message?.content?.some(c => c.type === 'tool_use' && c.name === 'Task')) return 'agent';
+    return 'claude';
+  }
+
+  /**
+   * Format message from JSONL entry
+   */
+  private formatMessage(entry: JSONLLogEntry): string {
+    if (entry.type === 'summary') {
+      return `Session Summary: ${entry.summary}`;
+    }
+    
+    if (entry.message?.content) {
+      const textContent = entry.message.content
+        .filter(c => c.type === 'text')
+        .map(c => c.text)
+        .join(' ');
+      
+      const toolUse = entry.message.content
+        .filter(c => c.type === 'tool_use')
+        .map(c => `[${c.name}] ${c.input?.description || 'Tool execution'}`)
+        .join(', ');
+      
+      return [textContent, toolUse].filter(Boolean).join(' | ');
+    }
+    
+    return entry.content || 'Unknown log entry';
+  }
+
+  /**
+   * Start watching for new JSONL files
    */
   async startWatching(callback: (session: ClaudeSession) => void): Promise<void> {
-    // chokidarを使用してファイルシステムを監視
-    // 新しいチャットファイルやログファイルが作成されたら解析を実行
     const chokidar = await import('chokidar');
     
     const watcher = chokidar.watch([
-      path.join(this.logDirectory, '.claude/chat/**/*.md'),
-      path.join(this.logDirectory, '**/*.log')
+      path.join(this.claudeProjectsDir, '**/*.jsonl')
     ], {
       ignored: /(^|[\/\\])\../, // 隠しファイルを除外
       persistent: true
     });
 
     watcher.on('add', async (filePath: string) => {
-      console.log(`新しいログファイルを検出: ${filePath}`);
+      console.log(`New JSONL log file detected: ${filePath}`);
       
-      if (filePath.endsWith('-team-chat.md')) {
-        const session = await this.parseTeamChatFile(filePath);
-        if (session) {
-          callback(session);
-        }
+      const session = await this.parseJSONLFile(filePath);
+      if (session) {
+        callback(session);
       }
     });
 
     watcher.on('change', async (filePath: string) => {
-      console.log(`ログファイルが更新されました: ${filePath}`);
+      console.log(`JSONL log file updated: ${filePath}`);
       
-      if (filePath.endsWith('-team-chat.md')) {
-        const session = await this.parseTeamChatFile(filePath);
-        if (session) {
-          callback(session);
-        }
+      const session = await this.parseJSONLFile(filePath);
+      if (session) {
+        callback(session);
       }
     });
 
-    console.log(`ログ監視を開始しました: ${this.logDirectory}`);
+    console.log(`Started watching for JSONL logs: ${this.claudeProjectsDir}`);
+  }
+
+  /**
+   * Get the correct Claude projects directory for current working directory
+   */
+  static getClaudeProjectsPath(workingDir: string): string {
+    const homeDir = os.homedir();
+    const baseProjectsDir = path.join(homeDir, '.claude', 'projects');
+    
+    // Convert working directory path to the format used by Claude Code
+    // e.g., /Users/user/project -> -Users-user-project
+    const encodedPath = workingDir.replace(/\//g, '-');
+    
+    return path.join(baseProjectsDir, encodedPath);
+  }
+
+  /**
+   * Find the most recent session file for a project
+   */
+  static async findLatestSessionFile(projectPath: string): Promise<string | null> {
+    try {
+      if (!(await fs.pathExists(projectPath))) {
+        return null;
+      }
+
+      const jsonlFiles = (await fs.readdir(projectPath))
+        .filter(name => name.endsWith('.jsonl'));
+
+      if (jsonlFiles.length === 0) {
+        return null;
+      }
+
+      // Get file stats and sort by modification time
+      const filesWithStats = await Promise.all(
+        jsonlFiles.map(async name => ({
+          name,
+          path: path.join(projectPath, name),
+          mtime: (await fs.stat(path.join(projectPath, name))).mtime
+        }))
+      );
+
+      const sortedFiles = filesWithStats.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+      
+      return sortedFiles[0].path;
+    } catch (error) {
+      console.error('Error finding latest session file:', error);
+      return null;
+    }
   }
 }

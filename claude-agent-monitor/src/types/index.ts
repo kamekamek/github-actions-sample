@@ -35,6 +35,7 @@ export interface ClaudeSession {
   totalTasks: number;
   completedTasks: number;
   agents: AgentActivity[];
+  metadata?: Record<string, any>;
 }
 
 // エージェント活動記録
@@ -52,6 +53,7 @@ export interface AgentActivity {
   files: FileOperation[];
   success: boolean;
   errorMessage?: string;
+  metadata?: Record<string, any>;
 }
 
 // タスク状態
